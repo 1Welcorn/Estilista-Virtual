@@ -1,5 +1,13 @@
 import { GoogleGenAI, Modality } from "@google/genai";
 
+function getApiKey(): string {
+    const apiKey = process.env.API_KEY;
+    if (!apiKey) {
+        throw new Error("A chave de API do Gemini (API_KEY) não foi encontrada no ambiente. Verifique as configurações do seu projeto.");
+    }
+    return apiKey;
+}
+
 /**
  * Takes a model image, an outfit image, and a text prompt, and returns a new image
  * with the model dressed in the outfit.
@@ -14,7 +22,8 @@ export async function styleModelWithOutfit(
   outfitImage: { data: string; mimeType: string },
   prompt: string
 ): Promise<string> {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+  const apiKey = getApiKey();
+  const ai = new GoogleGenAI({ apiKey });
 
   const pureModelBase64 = modelImage.data.split(',')[1];
   const pureOutfitBase64 = outfitImage.data.split(',')[1];
@@ -66,7 +75,6 @@ INSTRUÇÕES DETALHADAS:
     },
   });
 
-  // FIX: Add optional chaining and a fallback to an empty array to prevent crashing if the response has no candidates.
   for (const part of response.candidates?.[0]?.content?.parts || []) {
     if (part.inlineData) {
       const base64ImageBytes: string = part.inlineData.data;
@@ -85,7 +93,8 @@ INSTRUÇÕES DETALHADAS:
  * @returns A string containing the suggested trend name.
  */
 export async function generateTrendName(outfitImage: { data: string; mimeType: string }): Promise<string> {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+  const apiKey = getApiKey();
+  const ai = new GoogleGenAI({ apiKey });
 
   const pureOutfitBase64 = outfitImage.data.split(',')[1];
   if (!pureOutfitBase64) {
@@ -95,7 +104,7 @@ export async function generateTrendName(outfitImage: { data: string; mimeType: s
   const prompt = "Analyze the clothing item in this image. Provide a short, trendy, and descriptive name for it suitable for a fashion catalog. For example: 'Quantum Weave Jacket', 'Holographic Parka', or 'Bio-Luminescent Gown'. Respond with only the name and nothing else.";
 
   const response = await ai.models.generateContent({
-    model: 'gemini-2.5-flash', // Using a text model is more efficient for this task.
+    model: 'gemini-2.5-flash',
     contents: {
       parts: [
         {
@@ -109,7 +118,6 @@ export async function generateTrendName(outfitImage: { data: string; mimeType: s
     },
   });
 
-  // Clean up the response to get just the name.
   const trendName = response.text.trim().replace(/["'*]/g, '');
   return trendName;
 }
@@ -120,7 +128,8 @@ export async function generateTrendName(outfitImage: { data: string; mimeType: s
  * @returns A promise that resolves to an array of background suggestions.
  */
 export async function suggestBackgrounds(outfitImage: { data: string; mimeType: string }): Promise<string[]> {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+  const apiKey = getApiKey();
+  const ai = new GoogleGenAI({ apiKey });
 
   const pureOutfitBase64 = outfitImage.data.split(',')[1];
   if (!pureOutfitBase64) {
@@ -149,7 +158,6 @@ export async function suggestBackgrounds(outfitImage: { data: string; mimeType: 
       return [];
   }
 
-  // Split the response by comma and trim whitespace from each suggestion.
   const suggestions = suggestionsText.split(',').map(s => s.trim()).filter(s => s);
   return suggestions;
 }
