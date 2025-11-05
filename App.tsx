@@ -178,12 +178,16 @@ const App: React.FC = () => {
       setBackgrounds(bgSuggestions);
     } catch (err) {
       console.error("Erro ao analisar a roupa:", err);
-      const errorMessage = err instanceof Error ? err.message : "Ocorreu um erro desconhecido.";
-      if (errorMessage.includes("API Key")) {
-          setError("Por favor, certifique-se de que sua chave de API é válida.");
-      } else {
-          setError("Não foi possível analisar a imagem da roupa. Por favor, tente novamente.");
+      let displayError = "Não foi possível analisar a imagem da roupa. Por favor, tente novamente.";
+      if (err instanceof Error) {
+          const errorMessage = err.message;
+          if (errorMessage.includes('429') || errorMessage.includes('RESOURCE_EXHAUSTED')) {
+              displayError = "Você excedeu sua cota de uso da API. Verifique seu plano e faturamento ou tente novamente mais tarde.";
+          } else if (errorMessage.includes("API Key") || errorMessage.includes("Requested entity was not found")) {
+              displayError = "Sua chave de API não foi encontrada ou é inválida. Por favor, verifique sua configuração.";
+          }
       }
+      setError(displayError);
     }
   };
   
@@ -228,13 +232,17 @@ const App: React.FC = () => {
       const result = await styleModelWithOutfit(modelImageData, outfitImageData, finalPrompt);
       setGeneratedImage(result);
     } catch (err) {
-      console.error(err);
-      const errorMessage = err instanceof Error ? err.message : "Ocorreu um erro desconhecido.";
-      if (errorMessage.includes("API Key") || errorMessage.includes("Requested entity was not found")) {
-          setError("Sua chave de API não foi encontrada ou é inválida. Por favor, verifique sua configuração.");
-      } else {
-          setError(errorMessage);
+      console.error("Erro ao gerar a imagem:", err);
+      let displayError = "Ocorreu um erro ao gerar a imagem. Por favor, tente novamente.";
+      if (err instanceof Error) {
+          const errorMessage = err.message;
+          if (errorMessage.includes('429') || errorMessage.includes('RESOURCE_EXHAUSTED')) {
+              displayError = "Você excedeu sua cota de uso da API. Verifique seu plano e faturamento ou tente novamente mais tarde.";
+          } else if (errorMessage.includes("API Key") || errorMessage.includes("Requested entity was not found")) {
+              displayError = "Sua chave de API não foi encontrada ou é inválida. Por favor, verifique sua configuração.";
+          }
       }
+      setError(displayError);
     } finally {
       setIsLoading(false);
     }
