@@ -165,6 +165,7 @@ const App: React.FC = () => {
 
   const handleOutfitAnalysis = async (file: File) => {
     try {
+      setError(null);
       const base64String = await fileToBase64(file);
       const outfitImageData = { data: base64String, mimeType: file.type };
       
@@ -177,7 +178,12 @@ const App: React.FC = () => {
       setBackgrounds(bgSuggestions);
     } catch (err) {
       console.error("Erro ao analisar a roupa:", err);
-      setError("Não foi possível analisar a imagem da roupa. Por favor, tente novamente.");
+      const errorMessage = err instanceof Error ? err.message : "Ocorreu um erro desconhecido.";
+      if (errorMessage.includes("API Key")) {
+          setError("Por favor, certifique-se de que sua chave de API é válida.");
+      } else {
+          setError("Não foi possível analisar a imagem da roupa. Por favor, tente novamente.");
+      }
     }
   };
   
@@ -223,7 +229,12 @@ const App: React.FC = () => {
       setGeneratedImage(result);
     } catch (err) {
       console.error(err);
-      setError(err instanceof Error ? err.message : "Ocorreu um erro desconhecido.");
+      const errorMessage = err instanceof Error ? err.message : "Ocorreu um erro desconhecido.";
+      if (errorMessage.includes("API Key") || errorMessage.includes("Requested entity was not found")) {
+          setError("Sua chave de API não foi encontrada ou é inválida. Por favor, verifique sua configuração.");
+      } else {
+          setError(errorMessage);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -253,7 +264,6 @@ const App: React.FC = () => {
       <input id={id} type="file" accept="image/*" className="hidden" onChange={onImageChange} />
     </div>
   );
-
 
   return (
     <div className="bg-gray-900 min-h-screen text-gray-100 font-sans p-4 sm:p-6 lg:p-8">
