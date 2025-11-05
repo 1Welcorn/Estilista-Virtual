@@ -1,16 +1,11 @@
+
+
 import React, { useState, useRef, useEffect } from 'react';
 import { styleModelWithOutfit, generateTrendName, suggestBackgrounds } from './services/geminiService';
 import { fileToBase64 } from './utils/fileUtils';
 
-declare global {
-  // FIX: Inlined the type for `aistudio` to resolve declaration conflicts.
-  interface Window {
-    aistudio: {
-      hasSelectedApiKey: () => Promise<boolean>;
-      openSelectKey: () => Promise<void>;
-    };
-  }
-}
+// FIX: Removed the conflicting global declaration for `window.aistudio` to resolve type errors.
+// A global type definition for this likely exists elsewhere in the project.
 
 // SVG Icon Components
 const UploadIcon = () => (
@@ -169,30 +164,36 @@ const App: React.FC = () => {
   const [isCheckingApiKey, setIsCheckingApiKey] = useState(true);
   const [apiKeyError, setApiKeyError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const checkKey = async () => {
-      try {
-        setIsCheckingApiKey(true);
-        const hasKey = await window.aistudio.hasSelectedApiKey();
-        setIsApiKeySelected(hasKey);
-      } catch (e) {
-        console.error("Erro ao verificar a chave de API:", e);
-        setIsApiKeySelected(false);
-      } finally {
-        setIsCheckingApiKey(false);
+  const checkAndSetApiKey = async () => {
+    setIsCheckingApiKey(true);
+    try {
+      const hasKey = await window.aistudio.hasSelectedApiKey();
+      setIsApiKeySelected(hasKey);
+      if (hasKey) {
+        setApiKeyError(null);
       }
-    };
-    checkKey();
+    } catch (e) {
+      console.error("Erro ao verificar a chave de API:", e);
+      setIsApiKeySelected(false);
+      setApiKeyError("Ocorreu um erro ao verificar sua chave de API. Por favor, recarregue.");
+    } finally {
+      setIsCheckingApiKey(false);
+    }
+  };
+
+  useEffect(() => {
+    checkAndSetApiKey();
   }, []);
   
   const handleSelectKey = async () => {
+    setApiKeyError(null);
     try {
       await window.aistudio.openSelectKey();
-      setIsApiKeySelected(true);
-      setApiKeyError(null);
+      // After the dialog closes, we must re-check the key status
+      await checkAndSetApiKey();
     } catch (e) {
       console.error("Não foi possível abrir o seletor de chave de API:", e);
-      setApiKeyError("Não foi possível abrir o seletor de chave de API. Por favor, recarregue a página.");
+      setApiKeyError("Não foi possível abrir o seletor de chaves. Verifique sua conexão e tente novamente.");
     }
   };
 
@@ -439,16 +440,34 @@ const App: React.FC = () => {
 
             <div className="bg-gray-800 p-4 rounded-lg border border-gray-700 flex flex-col gap-4">
                 <h2 className="text-xl font-bold text-gray-300">4. Acessórios e Ajustes</h2>
-                <div className="flex flex-wrap gap-3">
-                    <button type="button" onClick={() => handleAccessoryToggle('footwear')} className={`transition-colors duration-200 ease-in-out font-medium py-2 px-4 rounded-lg text-sm ${accessories.footwear ? 'bg-indigo-600 text-white shadow-md' : 'bg-gray-700 hover:bg-gray-600 text-gray-200'}`}>
-                        Sugestão de calçado
-                    </button>
-                    <button type="button" onClick={() => handleAccessoryToggle('bag')} className={`transition-colors duration-200 ease-in-out font-medium py-2 px-4 rounded-lg text-sm ${accessories.bag ? 'bg-indigo-600 text-white shadow-md' : 'bg-gray-700 hover:bg-gray-600 text-gray-200'}`}>
-                        Sugestão de Bolsa
-                    </button>
-                    <button type="button" onClick={() => handleAccessoryToggle('fit')} className={`transition-colors duration-200 ease-in-out font-medium py-2 px-4 rounded-lg text-sm ${accessories.fit ? 'bg-indigo-600 text-white shadow-md' : 'bg-gray-700 hover:bg-gray-600 text-gray-200'}`}>
-                        Ajuste de modelagem
-                    </button>
+                <div className="space-y-3">
+                    <label className="flex items-center text-gray-300 cursor-pointer">
+                        <input 
+                            type="checkbox" 
+                            checked={accessories.footwear} 
+                            onChange={() => handleAccessoryToggle('footwear')} 
+                            className="h-5 w-5 rounded border-gray-600 bg-gray-700 text-indigo-600 focus:ring-indigo-500 focus:ring-2"
+                        />
+                        <span className="ml-3">Sugerir calçado</span>
+                    </label>
+                    <label className="flex items-center text-gray-300 cursor-pointer">
+                        <input 
+                            type="checkbox" 
+                            checked={accessories.bag} 
+                            onChange={() => handleAccessoryToggle('bag')} 
+                            className="h-5 w-5 rounded border-gray-600 bg-gray-700 text-indigo-600 focus:ring-indigo-500 focus:ring-2"
+                        />
+                        <span className="ml-3">Sugerir bolsa</span>
+                    </label>
+                    <label className="flex items-center text-gray-300 cursor-pointer">
+                        <input 
+                            type="checkbox" 
+                            checked={accessories.fit} 
+                            onChange={() => handleAccessoryToggle('fit')} 
+                            className="h-5 w-5 rounded border-gray-600 bg-gray-700 text-indigo-600 focus:ring-indigo-500 focus:ring-2"
+                        />
+                        <span className="ml-3">Ajuste de modelagem</span>
+                    </label>
                 </div>
             </div>
 
