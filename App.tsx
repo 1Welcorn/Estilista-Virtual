@@ -3,13 +3,12 @@ import { styleModelWithOutfit, generateTrendName, suggestBackgrounds } from './s
 import { fileToBase64 } from './utils/fileUtils';
 
 declare global {
-  // FIX: Define a named interface for aistudio to resolve declaration conflicts.
-  interface AIStudio {
-    hasSelectedApiKey: () => Promise<boolean>;
-    openSelectKey: () => Promise<void>;
-  }
+  // FIX: Inlined the type for `aistudio` to resolve declaration conflicts.
   interface Window {
-    aistudio: AIStudio;
+    aistudio: {
+      hasSelectedApiKey: () => Promise<boolean>;
+      openSelectKey: () => Promise<void>;
+    };
   }
 }
 
@@ -30,6 +29,12 @@ const SpinnerIcon = () => (
     <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+    </svg>
+);
+
+const KeyIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" viewBox="0 0 20 20" fill="currentColor">
+        <path fillRule="evenodd" d="M18 8a6 6 0 01-7.743 5.743L4.257 19.743A1 1 0 012.843 18.33l6-6A6 6 0 1118 8zm-6-3a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
     </svg>
 );
 
@@ -317,7 +322,7 @@ const App: React.FC = () => {
     }
   };
   
-  const ImageUploader = ({ title, image, onImageChange, id, onTakePhotoClick }) => (
+  const ImageUploader = ({ title, image, onImageChange, id, onTakePhotoClick }: { title: string, image: { preview: string } | null, onImageChange: (e: React.ChangeEvent<HTMLInputElement>) => void, id: string, onTakePhotoClick: () => void }) => (
     <div className="bg-gray-800 p-4 rounded-lg border border-gray-700 flex flex-col gap-4">
       <h2 className="text-xl font-bold text-center text-gray-300">{title}</h2>
       <div className="flex-grow flex items-center justify-center">
@@ -358,9 +363,19 @@ const App: React.FC = () => {
 
   return (
     <div className="bg-gray-900 min-h-screen text-gray-100 font-sans p-4 sm:p-6 lg:p-8">
-      <header className="text-center mb-10">
+      <header className="text-center mb-10 relative">
         <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-white">Estilista Virtual AI</h1>
         <p className="mt-2 text-lg text-gray-400 max-w-2xl mx-auto">Vista qualquer modelo com qualquer roupa e crie o cenário perfeito. A moda do futuro, hoje.</p>
+        <div className="absolute top-0 right-0">
+          <button 
+            onClick={handleSelectKey}
+            className="flex items-center bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-md transition-colors text-sm"
+            aria-label="Mudar Chave de API"
+          >
+            <KeyIcon />
+            Mudar Chave de API
+          </button>
+        </div>
       </header>
 
       <main className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-8">
