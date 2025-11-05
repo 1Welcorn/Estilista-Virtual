@@ -1,7 +1,17 @@
-// FIX: Replaced placeholder content with a functional React component to fix module and syntax errors.
 import React, { useState, useRef, useEffect } from 'react';
 import { styleModelWithOutfit, generateTrendName, suggestBackgrounds } from './services/geminiService';
 import { fileToBase64 } from './utils/fileUtils';
+
+declare global {
+  // FIX: Define a named interface for aistudio to resolve declaration conflicts.
+  interface AIStudio {
+    hasSelectedApiKey: () => Promise<boolean>;
+    openSelectKey: () => Promise<void>;
+  }
+  interface Window {
+    aistudio: AIStudio;
+  }
+}
 
 // SVG Icon Components
 const UploadIcon = () => (
@@ -111,6 +121,28 @@ const CameraModal: React.FC<{ isOpen: boolean; onClose: () => void; onCapture: (
     );
 };
 
+const ApiKeySelectionScreen: React.FC<{ onSelectKey: () => void; error?: string | null }> = ({ onSelectKey, error }) => (
+    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-900 text-gray-100 p-4">
+        <div className="bg-gray-800 p-8 rounded-lg border border-gray-700 shadow-2xl text-center max-w-md w-full">
+            <h1 className="text-3xl font-bold text-white mb-4">Bem-vindo ao Estilista Virtual AI</h1>
+            <p className="text-gray-400 mb-6">Para usar este aplicativo, você precisa selecionar uma chave de API do Google AI Studio. Isso permite que o aplicativo se comunique com os modelos de IA da Gemini.</p>
+            {error && <p className="text-red-400 text-center bg-red-900/20 p-3 rounded-md animate-fade-in mb-4">{error}</p>}
+            <button
+                onClick={onSelectKey}
+                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-md transition-colors text-lg shadow-lg"
+            >
+                Selecionar Chave de API
+            </button>
+            <p className="text-xs text-gray-500 mt-4">
+                O uso da API Gemini pode incorrer em custos. Por favor, revise a{' '}
+                <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" rel="noopener noreferrer" className="underline hover:text-indigo-400">
+                    documentação de faturamento
+                </a> para mais detalhes.
+            </p>
+        </div>
+    </div>
+);
+
 
 const App: React.FC = () => {
   const [modelImage, setModelImage] = useState<{ file: File, preview: string } | null>(null);
@@ -127,6 +159,38 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [cameraState, setCameraState] = useState<{ open: boolean; target: 'model' | 'outfit' | null }>({ open: false, target: null });
+  
+  const [isApiKeySelected, setIsApiKeySelected] = useState(false);
+  const [isCheckingApiKey, setIsCheckingApiKey] = useState(true);
+  const [apiKeyError, setApiKeyError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const checkKey = async () => {
+      try {
+        setIsCheckingApiKey(true);
+        const hasKey = await window.aistudio.hasSelectedApiKey();
+        setIsApiKeySelected(hasKey);
+      } catch (e) {
+        console.error("Erro ao verificar a chave de API:", e);
+        setIsApiKeySelected(false);
+      } finally {
+        setIsCheckingApiKey(false);
+      }
+    };
+    checkKey();
+  }, []);
+  
+  const handleSelectKey = async () => {
+    try {
+      await window.aistudio.openSelectKey();
+      setIsApiKeySelected(true);
+      setApiKeyError(null);
+    } catch (e) {
+      console.error("Não foi possível abrir o seletor de chave de API:", e);
+      setApiKeyError("Não foi possível abrir o seletor de chave de API. Por favor, recarregue a página.");
+    }
+  };
+
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>, setImage: React.Dispatch<React.SetStateAction<{ file: File; preview: string; } | null>>) => {
     if (e.target.files && e.target.files[0]) {
@@ -181,10 +245,13 @@ const App: React.FC = () => {
       let displayError = "Não foi possível analisar a imagem da roupa. Por favor, tente novamente.";
       if (err instanceof Error) {
           const errorMessage = err.message;
-          if (errorMessage.includes('429') || errorMessage.includes('RESOURCE_EXHAUSTED')) {
+          if (errorMessage.includes("API key not valid") || errorMessage.includes("API_KEY_INVALID") || errorMessage.includes("Requested entity was not found")) {
+            displayError = "Sua chave de API não é válida. Por favor, selecione uma chave válida.";
+            setApiKeyError(displayError);
+            setIsApiKeySelected(false);
+            return;
+          } else if (errorMessage.includes('429') || errorMessage.includes('RESOURCE_EXHAUSTED')) {
               displayError = "Você excedeu sua cota de uso da API. Verifique seu plano e faturamento ou tente novamente mais tarde.";
-          } else if (errorMessage.includes("API Key") || errorMessage.includes("Requested entity was not found")) {
-              displayError = "Sua chave de API não foi encontrada ou é inválida. Por favor, verifique sua configuração.";
           }
       }
       setError(displayError);
@@ -236,10 +303,12 @@ const App: React.FC = () => {
       let displayError = "Ocorreu um erro ao gerar a imagem. Por favor, tente novamente.";
       if (err instanceof Error) {
           const errorMessage = err.message;
-          if (errorMessage.includes('429') || errorMessage.includes('RESOURCE_EXHAUSTED')) {
+          if (errorMessage.includes("API key not valid") || errorMessage.includes("API_KEY_INVALID") || errorMessage.includes("Requested entity was not found")) {
+            displayError = "Sua chave de API não é válida. Por favor, selecione uma chave válida.";
+            setApiKeyError(displayError);
+            setIsApiKeySelected(false);
+          } else if (errorMessage.includes('429') || errorMessage.includes('RESOURCE_EXHAUSTED')) {
               displayError = "Você excedeu sua cota de uso da API. Verifique seu plano e faturamento ou tente novamente mais tarde.";
-          } else if (errorMessage.includes("API Key") || errorMessage.includes("Requested entity was not found")) {
-              displayError = "Sua chave de API não foi encontrada ou é inválida. Por favor, verifique sua configuração.";
           }
       }
       setError(displayError);
@@ -272,6 +341,20 @@ const App: React.FC = () => {
       <input id={id} type="file" accept="image/*" className="hidden" onChange={onImageChange} />
     </div>
   );
+
+  if (isCheckingApiKey) {
+    return (
+        <div className="flex flex-col items-center justify-center min-h-screen bg-gray-900 text-gray-100 p-4">
+            <SpinnerIcon />
+            <p className="mt-2 text-lg">Verificando configuração...</p>
+        </div>
+    );
+  }
+
+  if (!isApiKeySelected) {
+    return <ApiKeySelectionScreen onSelectKey={handleSelectKey} error={apiKeyError} />;
+  }
+
 
   return (
     <div className="bg-gray-900 min-h-screen text-gray-100 font-sans p-4 sm:p-6 lg:p-8">

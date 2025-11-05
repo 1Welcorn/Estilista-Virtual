@@ -14,8 +14,7 @@ export async function styleModelWithOutfit(
   outfitImage: { data: string; mimeType: string },
   prompt: string
 ): Promise<string> {
-  // FIX: Initialize GoogleGenAI directly with the API key from environment variables as per guidelines.
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
   const pureModelBase64 = modelImage.data.split(',')[1];
   const pureOutfitBase64 = outfitImage.data.split(',')[1];
@@ -85,8 +84,7 @@ INSTRUÇÕES DETALHADAS:
  * @returns A string containing the suggested trend name.
  */
 export async function generateTrendName(outfitImage: { data: string; mimeType: string }): Promise<string> {
-  // FIX: Initialize GoogleGenAI directly with the API key from environment variables as per guidelines.
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
   const pureOutfitBase64 = outfitImage.data.split(',')[1];
   if (!pureOutfitBase64) {
@@ -120,8 +118,7 @@ export async function generateTrendName(outfitImage: { data: string; mimeType: s
  * @returns A promise that resolves to an array of background suggestions.
  */
 export async function suggestBackgrounds(outfitImage: { data: string; mimeType: string }): Promise<string[]> {
-  // FIX: Initialize GoogleGenAI directly with the API key from environment variables as per guidelines.
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
   const pureOutfitBase64 = outfitImage.data.split(',')[1];
   if (!pureOutfitBase64) {
