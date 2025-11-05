@@ -1,30 +1,167 @@
 // FIX: Replaced placeholder content with a functional React component to fix module and syntax errors.
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { styleModelWithOutfit, generateTrendName, suggestBackgrounds } from './services/geminiService';
 import { fileToBase64 } from './utils/fileUtils';
+
+// SVG Icon Components
+const UploadIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+  </svg>
+);
+
+const ImageIcon = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+    </svg>
+);
+
+const SpinnerIcon = () => (
+    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+    </svg>
+);
+
+// Define background options with display names and prompt values for the AI
+const backgroundOptions = [
+    { name: 'Estúdio Neutro', value: 'Use um fundo de estúdio neutro.' },
+    { name: 'Cidade à Noite', value: 'Em uma cidade à noite com luzes de neon.' },
+    { name: 'Praia Tropical', value: 'Em uma praia tropical ensolarada com águas cristalinas.' },
+    { name: 'Jardim Botânico', value: 'Em um jardim botânico exuberante com flores vibrantes.' },
+    { name: 'Arquitetura', value: 'Com um fundo de arquitetura moderna e minimalista.' },
+];
+
+// Helper to format suggestion strings for button labels
+const toTitleCase = (str: string) => str.charAt(0).toUpperCase() + str.slice(1);
+
+const CameraModal: React.FC<{ isOpen: boolean; onClose: () => void; onCapture: (file: File) => void; }> = ({ isOpen, onClose, onCapture }) => {
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+    const streamRef = useRef<MediaStream | null>(null);
+
+    useEffect(() => {
+        const startCamera = async () => {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                streamRef.current = stream;
+                if (videoRef.current) {
+                    videoRef.current.srcObject = stream;
+                }
+            } catch (err) {
+                console.error("Erro ao acessar a câmera: ", err);
+                alert("Não foi possível acessar a câmera. Verifique as permissões no seu navegador.");
+                onClose();
+            }
+        };
+
+        const stopCamera = () => {
+            if (streamRef.current) {
+                streamRef.current.getTracks().forEach(track => track.stop());
+                streamRef.current = null;
+            }
+        };
+
+        if (isOpen) {
+            startCamera();
+        } else {
+            stopCamera();
+        }
+
+        return () => {
+            stopCamera();
+        };
+    }, [isOpen, onClose]);
+
+    const handleCapture = () => {
+        if (videoRef.current && canvasRef.current) {
+            const video = videoRef.current;
+            const canvas = canvasRef.current;
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const context = canvas.getContext('2d');
+            context?.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
+            
+            canvas.toBlob((blob) => {
+                if (blob) {
+                    const photoFile = new File([blob], `capture-${Date.now()}.jpg`, { type: 'image/jpeg' });
+                    onCapture(photoFile);
+                }
+            }, 'image/jpeg');
+        }
+    };
+
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 animate-fade-in">
+            <div className="bg-gray-800 p-4 rounded-lg max-w-3xl w-full border border-gray-700 shadow-2xl">
+                <video ref={videoRef} autoPlay playsInline className="w-full rounded-md aspect-video object-cover"></video>
+                <canvas ref={canvasRef} className="hidden"></canvas>
+                <div className="mt-4 flex justify-center gap-4">
+                    <button onClick={handleCapture} className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-md transition-colors">
+                        Capturar
+                    </button>
+                    <button onClick={onClose} className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-6 rounded-md transition-colors">
+                        Cancelar
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 
 const App: React.FC = () => {
   const [modelImage, setModelImage] = useState<{ file: File, preview: string } | null>(null);
   const [outfitImage, setOutfitImage] = useState<{ file: File, preview: string } | null>(null);
-  const [prompt, setPrompt] = useState<string>('Use um fundo de estúdio neutro.');
+  const [prompt, setPrompt] = useState<string>(backgroundOptions[0].value);
+  const [accessories, setAccessories] = useState({
+    footwear: false,
+    bag: false,
+    fit: false,
+  });
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
   const [trendName, setTrendName] = useState<string>('');
   const [backgrounds, setBackgrounds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [cameraState, setCameraState] = useState<{ open: boolean; target: 'model' | 'outfit' | null }>({ open: false, target: null });
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>, setImage: React.Dispatch<React.SetStateAction<{ file: File; preview: string; } | null>>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      setImage({
-        file,
-        preview: URL.createObjectURL(file)
-      });
+      const preview = URL.createObjectURL(file);
+      setImage({ file, preview });
+
+      if (setImage === setModelImage && modelImage) URL.revokeObjectURL(modelImage.preview);
+      if (setImage === setOutfitImage && outfitImage) URL.revokeObjectURL(outfitImage.preview);
+      
       if (setImage === setOutfitImage) {
         handleOutfitAnalysis(file);
       }
     }
   };
+  
+  const handlePhotoCapture = (photoFile: File) => {
+    const { target } = cameraState;
+    if (!target) return;
+
+    const preview = URL.createObjectURL(photoFile);
+    const newImage = { file: photoFile, preview };
+
+    if (target === 'model') {
+        if (modelImage) URL.revokeObjectURL(modelImage.preview);
+        setModelImage(newImage);
+    } else {
+        if (outfitImage) URL.revokeObjectURL(outfitImage.preview);
+        setOutfitImage(newImage);
+        handleOutfitAnalysis(photoFile);
+    }
+    
+    setCameraState({ open: false, target: null });
+  };
+
 
   const handleOutfitAnalysis = async (file: File) => {
     try {
@@ -38,13 +175,17 @@ const App: React.FC = () => {
       
       setTrendName(name);
       setBackgrounds(bgSuggestions);
-      if (bgSuggestions.length > 0 && prompt === 'Use um fundo de estúdio neutro.') {
-        setPrompt(bgSuggestions[0]);
-      }
     } catch (err) {
       console.error("Erro ao analisar a roupa:", err);
       setError("Não foi possível analisar a imagem da roupa. Por favor, tente novamente.");
     }
+  };
+  
+  const handleAccessoryToggle = (accessory: keyof typeof accessories) => {
+    setAccessories(prev => ({
+        ...prev,
+        [accessory]: !prev[accessory]
+    }));
   };
 
 
@@ -65,8 +206,20 @@ const App: React.FC = () => {
 
       const modelImageData = { data: modelBase64, mimeType: modelImage.file.type };
       const outfitImageData = { data: outfitBase64, mimeType: outfitImage.file.type };
+      
+      let finalPrompt = prompt;
+      if (accessories.footwear) {
+        finalPrompt += " Adicione um calçado da moda que combine perfeitamente com a roupa.";
+      }
+      if (accessories.bag) {
+        finalPrompt += " Adicione uma bolsa da moda que combine perfeitamente com a roupa.";
+      }
+      if (accessories.fit) {
+        finalPrompt += " Ajuste a modelagem e o tamanho da roupa para um caimento perfeito e realista no corpo do modelo.";
+      }
 
-      const result = await styleModelWithOutfit(modelImageData, outfitImageData, prompt);
+
+      const result = await styleModelWithOutfit(modelImageData, outfitImageData, finalPrompt);
       setGeneratedImage(result);
     } catch (err) {
       console.error(err);
@@ -75,58 +228,155 @@ const App: React.FC = () => {
       setIsLoading(false);
     }
   };
-
-  return (
-    <div style={{ fontFamily: 'sans-serif', maxWidth: '800px', margin: 'auto', padding: '20px' }}>
-      <h1>Provador Virtual com IA</h1>
-      <form onSubmit={handleSubmit}>
-        <div style={{ display: 'flex', gap: '20px', marginBottom: '20px' }}>
-          <div style={{ flex: 1 }}>
-            <h2>1. Escolha o Modelo</h2>
-            <input type="file" accept="image/*" onChange={(e) => handleImageChange(e, setModelImage)} required />
-            {modelImage && <img src={modelImage.preview} alt="Modelo" style={{ width: '100%', marginTop: '10px' }} />}
-          </div>
-          <div style={{ flex: 1 }}>
-            <h2>2. Escolha a Roupa</h2>
-            <input type="file" accept="image/*" onChange={(e) => handleImageChange(e, setOutfitImage)} required />
-            {outfitImage && <img src={outfitImage.preview} alt="Roupa" style={{ width: '100%', marginTop: '10px' }} />}
-          </div>
-        </div>
-        
-        {trendName && <p>Nome da tendência: <strong>{trendName}</strong></p>}
-
-        <h2>3. Descreva o Cenário</h2>
-        <textarea
-          value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
-          rows={3}
-          style={{ width: '100%', marginBottom: '10px' }}
-          placeholder="Ex: Fundo de estúdio, praia ensolarada, cidade à noite..."
-        />
-        {backgrounds.length > 0 && (
-          <div>
-            <p>Sugestões de fundo:</p>
-            {backgrounds.map((bg, index) => (
-              <button key={index} type="button" onClick={() => setPrompt(bg)} style={{marginRight: '5px', marginBottom: '5px'}}>
-                {bg}
-              </button>
-            ))}
+  
+  const ImageUploader = ({ title, image, onImageChange, id, onTakePhotoClick }) => (
+    <div className="bg-gray-800 p-4 rounded-lg border border-gray-700 flex flex-col gap-4">
+      <h2 className="text-xl font-bold text-center text-gray-300">{title}</h2>
+      <div className="flex-grow flex items-center justify-center">
+        {image ? (
+          <img src={image.preview} alt="Preview" className="w-full h-64 object-cover rounded-md" />
+        ) : (
+          <div className="w-full h-64 flex flex-col items-center justify-center bg-gray-700/50 rounded-md border-2 border-dashed border-gray-600">
+            <UploadIcon />
+            <p className="mt-2 text-sm text-gray-400 text-center">Arraste e solte ou carregue uma imagem</p>
           </div>
         )}
-
-        <button type="submit" disabled={isLoading || !modelImage || !outfitImage} style={{ padding: '10px 20px', fontSize: '16px', cursor: 'pointer', marginTop: '10px' }}>
-          {isLoading ? 'Gerando...' : 'Vestir Modelo'}
+      </div>
+       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <label htmlFor={id} className="cursor-pointer bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-md transition-colors text-center flex items-center justify-center">
+          Do Arquivo
+        </label>
+        <button type="button" onClick={onTakePhotoClick} className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-md transition-colors text-center flex items-center justify-center">
+          Da Câmera
         </button>
-      </form>
+      </div>
+      <input id={id} type="file" accept="image/*" className="hidden" onChange={onImageChange} />
+    </div>
+  );
 
-      {error && <p style={{ color: 'red' }}>Erro: {error}</p>}
 
-      {generatedImage && (
-        <div style={{ marginTop: '30px' }}>
-          <h2>Resultado</h2>
-          <img src={generatedImage} alt="Modelo com nova roupa" style={{ width: '100%' }} />
+  return (
+    <div className="bg-gray-900 min-h-screen text-gray-100 font-sans p-4 sm:p-6 lg:p-8">
+      <header className="text-center mb-10">
+        <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-white">Estilista Virtual AI</h1>
+        <p className="mt-2 text-lg text-gray-400 max-w-2xl mx-auto">Vista qualquer modelo com qualquer roupa e crie o cenário perfeito. A moda do futuro, hoje.</p>
+      </header>
+
+      <main className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Coluna de Controles */}
+        <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                 <ImageUploader title="1. Escolha o Modelo" image={modelImage} onImageChange={(e) => handleImageChange(e, setModelImage)} id="model-upload" onTakePhotoClick={() => setCameraState({ open: true, target: 'model'})} />
+                 <ImageUploader title="2. Escolha a Roupa" image={outfitImage} onImageChange={(e) => handleImageChange(e, setOutfitImage)} id="outfit-upload" onTakePhotoClick={() => setCameraState({ open: true, target: 'outfit'})} />
+            </div>
+
+            {trendName && (
+                <div className="bg-gray-800 p-4 rounded-lg border border-gray-700 text-center animate-fade-in">
+                    <p className="text-sm text-gray-400">Nome da Tendência Sugerido</p>
+                    <p className="text-xl font-semibold text-indigo-400">{trendName}</p>
+                </div>
+            )}
+            
+            <div className="bg-gray-800 p-4 rounded-lg border border-gray-700 flex flex-col gap-4">
+                <h2 className="text-xl font-bold text-gray-300">3. Escolha o Cenário</h2>
+                <div className="flex flex-wrap gap-3">
+                    {backgroundOptions.map((option) => (
+                        <button
+                            key={option.name}
+                            type="button"
+                            onClick={() => setPrompt(option.value)}
+                            className={`transition-colors duration-200 ease-in-out font-medium py-2 px-4 rounded-lg text-sm
+                                ${prompt === option.value
+                                    ? 'bg-indigo-600 text-white shadow-md'
+                                    : 'bg-gray-700 hover:bg-gray-600 text-gray-200'
+                                }`
+                            }
+                        >
+                            {option.name}
+                        </button>
+                    ))}
+                </div>
+
+                {backgrounds.length > 0 && (
+                    <div className="animate-fade-in border-t border-gray-700 pt-4 mt-2">
+                        <p className="text-sm font-medium text-gray-400 mb-3">Sugestões com base na roupa:</p>
+                        <div className="flex flex-wrap gap-3">
+                            {backgrounds.map((bg, index) => (
+                                <button
+                                    key={index}
+                                    type="button"
+                                    onClick={() => setPrompt(bg)}
+                                    className={`transition-colors duration-200 ease-in-out font-medium py-2 px-4 rounded-lg text-sm text-left
+                                        ${prompt === bg
+                                            ? 'bg-indigo-600 text-white shadow-md'
+                                            : 'bg-gray-700 hover:bg-gray-600 text-gray-200'
+                                        }`
+                                    }
+                                >
+                                    {toTitleCase(bg)}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            <div className="bg-gray-800 p-4 rounded-lg border border-gray-700 flex flex-col gap-4">
+                <h2 className="text-xl font-bold text-gray-300">4. Acessórios e Ajustes</h2>
+                <div className="flex flex-wrap gap-3">
+                    <button type="button" onClick={() => handleAccessoryToggle('footwear')} className={`transition-colors duration-200 ease-in-out font-medium py-2 px-4 rounded-lg text-sm ${accessories.footwear ? 'bg-indigo-600 text-white shadow-md' : 'bg-gray-700 hover:bg-gray-600 text-gray-200'}`}>
+                        Sugestão de calçado
+                    </button>
+                    <button type="button" onClick={() => handleAccessoryToggle('bag')} className={`transition-colors duration-200 ease-in-out font-medium py-2 px-4 rounded-lg text-sm ${accessories.bag ? 'bg-indigo-600 text-white shadow-md' : 'bg-gray-700 hover:bg-gray-600 text-gray-200'}`}>
+                        Sugestão de Bolsa
+                    </button>
+                    <button type="button" onClick={() => handleAccessoryToggle('fit')} className={`transition-colors duration-200 ease-in-out font-medium py-2 px-4 rounded-lg text-sm ${accessories.fit ? 'bg-indigo-600 text-white shadow-md' : 'bg-gray-700 hover:bg-gray-600 text-gray-200'}`}>
+                        Ajuste de modelagem
+                    </button>
+                </div>
+            </div>
+
+
+            <button type="submit" disabled={isLoading || !modelImage || !outfitImage} className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-bold py-3 px-4 rounded-md transition-colors flex items-center justify-center text-lg shadow-lg">
+                {isLoading ? <><SpinnerIcon /> Gerando...</> : 'Vestir Modelo'}
+            </button>
+             {error && <p className="text-red-400 text-center bg-red-900/20 p-3 rounded-md animate-fade-in">Erro: {error}</p>}
+        </form>
+
+        {/* Coluna de Resultado */}
+        <div className="bg-gray-800 p-4 rounded-lg border border-gray-700 flex flex-col items-center justify-center min-h-[500px] lg:min-h-full">
+            <h2 className="text-2xl font-bold text-gray-300 mb-4">Resultado</h2>
+            <div className="w-full flex-grow flex items-center justify-center">
+                {isLoading && (
+                    <div className="flex flex-col items-center justify-center text-gray-400 animate-fade-in">
+                        <SpinnerIcon />
+                        <p className="mt-2">A IA está criando sua imagem...</p>
+                    </div>
+                )}
+                {!isLoading && error && (
+                     <div className="text-center text-red-400 animate-fade-in p-4">
+                        <p>Ocorreu um erro ao gerar a imagem.</p>
+                        <p className="text-sm mt-1">{error}</p>
+                    </div>
+                )}
+                {!isLoading && !error && generatedImage && (
+                    <img src={generatedImage} alt="Modelo com nova roupa" className="w-full max-w-md h-auto object-contain rounded-md animate-fade-in shadow-2xl" />
+                )}
+                {!isLoading && !error && !generatedImage && (
+                    <div className="text-center text-gray-500">
+                        <ImageIcon />
+                        <p className="mt-2">O resultado da sua criação aparecerá aqui.</p>
+                    </div>
+                )}
+            </div>
         </div>
-      )}
+      </main>
+      
+      <CameraModal 
+        isOpen={cameraState.open} 
+        onClose={() => setCameraState({ open: false, target: null })}
+        onCapture={handlePhotoCapture}
+      />
     </div>
   );
 };

@@ -1,5 +1,7 @@
 {
   "name": "EstilistaVirtualAI",
   "description": "Envie uma foto de uma roupa ou modelo e use prompts de texto para editar a imagem. Experimente com diferentes cores, estilos, acessórios e mais para visualizar seu look perfeito com o poder da IA.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [
+    "camera"
+  ]
 }

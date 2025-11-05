@@ -128,7 +128,7 @@ export async function suggestBackgrounds(outfitImage: { data: string; mimeType: 
     throw new Error("Formato de dados da imagem base64 inválido.");
   }
 
-  const prompt = `Analyze the clothing in this image. Suggest 3-4 suitable and consistent background scenarios for a professional photoshoot. For example, if it's a bikini, suggest 'a sunny beach with turquoise water'. If it's a formal suit, suggest 'a modern city skyline at dusk'. Also include a simple option like 'a neutral studio backdrop' or 'a solid light gray background' if appropriate. Respond ONLY with a comma-separated list of these short, descriptive phrases and nothing else.`;
+  const prompt = `Analise a peça de roupa nesta imagem. Sugira 3-4 cenários de fundo adequados e consistentes para uma sessão de fotos profissional. Por exemplo, se for um biquíni, sugira 'uma praia ensolarada com água azul-turquesa'. Se for um terno formal, sugira 'um horizonte de cidade moderna ao anoitecer'. Inclua também uma opção simples como 'um fundo de estúdio neutro' ou 'um fundo cinza claro sólido', se apropriado. Responda APENAS com uma lista separada por vírgulas dessas frases curtas e descritivas e nada mais.`;
 
   const response = await ai.models.generateContent({
     model: 'gemini-2.5-flash',
