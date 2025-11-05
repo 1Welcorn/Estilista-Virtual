@@ -1,13 +1,5 @@
 import { GoogleGenAI, Modality } from "@google/genai";
 
-function getApiKey(): string {
-    const apiKey = process.env.API_KEY;
-    if (!apiKey) {
-        throw new Error("A chave de API do Gemini (API_KEY) não foi encontrada no ambiente. Verifique as configurações do seu projeto.");
-    }
-    return apiKey;
-}
-
 /**
  * Takes a model image, an outfit image, and a text prompt, and returns a new image
  * with the model dressed in the outfit.
@@ -22,8 +14,8 @@ export async function styleModelWithOutfit(
   outfitImage: { data: string; mimeType: string },
   prompt: string
 ): Promise<string> {
-  const apiKey = getApiKey();
-  const ai = new GoogleGenAI({ apiKey });
+  // FIX: Initialize GoogleGenAI directly with the API key from environment variables as per guidelines.
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
 
   const pureModelBase64 = modelImage.data.split(',')[1];
   const pureOutfitBase64 = outfitImage.data.split(',')[1];
@@ -93,8 +85,8 @@ INSTRUÇÕES DETALHADAS:
  * @returns A string containing the suggested trend name.
  */
 export async function generateTrendName(outfitImage: { data: string; mimeType: string }): Promise<string> {
-  const apiKey = getApiKey();
-  const ai = new GoogleGenAI({ apiKey });
+  // FIX: Initialize GoogleGenAI directly with the API key from environment variables as per guidelines.
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
 
   const pureOutfitBase64 = outfitImage.data.split(',')[1];
   if (!pureOutfitBase64) {
@@ -128,8 +120,8 @@ export async function generateTrendName(outfitImage: { data: string; mimeType: s
  * @returns A promise that resolves to an array of background suggestions.
  */
 export async function suggestBackgrounds(outfitImage: { data: string; mimeType: string }): Promise<string[]> {
-  const apiKey = getApiKey();
-  const ai = new GoogleGenAI({ apiKey });
+  // FIX: Initialize GoogleGenAI directly with the API key from environment variables as per guidelines.
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
 
   const pureOutfitBase64 = outfitImage.data.split(',')[1];
   if (!pureOutfitBase64) {
