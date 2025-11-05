@@ -4,8 +4,21 @@ import React, { useState, useRef, useEffect } from 'react';
 import { styleModelWithOutfit, generateTrendName, suggestBackgrounds } from './services/geminiService';
 import { fileToBase64 } from './utils/fileUtils';
 
-// FIX: Removed the conflicting global declaration for `window.aistudio` to resolve type errors.
-// A global type definition for this likely exists elsewhere in the project.
+// Add global type definitions for the aistudio object to ensure type safety.
+// FIX: The TypeScript compiler reported a conflict with an existing global declaration for `window.aistudio`.
+// To resolve this, a named interface `AIStudio` is defined and used, as suggested by the error message
+// which expects `aistudio` to be of type `AIStudio`.
+interface AIStudio {
+  hasSelectedApiKey: () => Promise<boolean>;
+  openSelectKey: () => Promise<void>;
+}
+
+declare global {
+  interface Window {
+    aistudio: AIStudio;
+  }
+}
+
 
 // SVG Icon Components
 const UploadIcon = () => (
@@ -182,7 +195,26 @@ const App: React.FC = () => {
   };
 
   useEffect(() => {
-    checkAndSetApiKey();
+    // Poll for the aistudio object to ensure it's loaded before we use it.
+    const intervalId = setInterval(() => {
+      if (window.aistudio) {
+        clearInterval(intervalId);
+        clearTimeout(timeoutId);
+        checkAndSetApiKey();
+      }
+    }, 100);
+
+    // If the aistudio object doesn't load after 5 seconds, show an error.
+    const timeoutId = setTimeout(() => {
+      clearInterval(intervalId);
+      setIsCheckingApiKey(false);
+      setApiKeyError("Não foi possível inicializar o seletor de chave de API. Por favor, recarregue a página e tente novamente.");
+    }, 5000);
+
+    return () => {
+      clearInterval(intervalId);
+      clearTimeout(timeoutId);
+    };
   }, []);
   
   const handleSelectKey = async () => {
